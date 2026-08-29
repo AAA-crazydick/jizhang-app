@@ -165,6 +165,7 @@
 
         <div class="card">
           <h3>分类管理</h3>
+          <p class="hint">点击分类可改名称、图标和颜色，用箭头调整顺序。</p>
           <div id="cat-manage"></div>
           <button class="setting-btn" id="add-cat-btn">＋ 添加分类</button>
         </div>
@@ -289,6 +290,29 @@
       <div class="edit-actions">
         <button class="setting-btn confirm-cancel" id="confirm-cancel">取消</button>
         <button class="confirm-ok danger" id="confirm-ok">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 编辑分类弹层 -->
+  <div class="sheet-backdrop hidden" id="ecat-backdrop">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h2>编辑分类</h2>
+        <button class="sheet-close" id="ecat-close" aria-label="关闭">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <label class="field-label">分类名称</label>
+      <input class="note-input" id="ec-name-input" type="text" autocomplete="off">
+      <label class="field-label">用于</label>
+      <div class="type-static"><span class="manage-badge" id="ec-type-label">支出</span></div>
+      <label class="field-label">选择图标</label>
+      <div class="icon-picker" id="ec-icon-picker"></div>
+      <label class="field-label">选择颜色</label>
+      <div class="color-picker" id="ec-color-picker"></div>
+      <div class="edit-actions">
+        <button class="save-btn flex-1" id="ec-save-btn">保存修改</button>
       </div>
     </div>
   </div>

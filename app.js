@@ -3,6 +3,8 @@
 /* ================= 常量与工具 ================= */
 const LS_RECORDS = 'jz_records_v1';
 const LS_CATS = 'jz_custom_cats_v1';
+const LS_CATS_OV = 'jz_cat_ov_v1';      /* 对任意分类（含默认）的改名/图标/颜色覆盖 */
+const LS_CATS_ORDER = 'jz_cat_order_v1'; /* 分类显示顺序 */
 const LS_LAST_BACKUP = 'jz_last_backup_v1';
 
 const $ = (s) => document.querySelector(s);
@@ -95,12 +97,27 @@ function loadRecords() {
 function saveRecords(rs) { localStorage.setItem(LS_RECORDS, JSON.stringify(rs)); }
 
 let _catsCache = null;
+function loadOverrides() {
+  try { return JSON.parse(localStorage.getItem(LS_CATS_OV) || '{}'); } catch (e) { return {}; }
+}
+function saveOverrides(ov) { localStorage.setItem(LS_CATS_OV, JSON.stringify(ov)); _catsCache = null; }
+function loadCatOrder() {
+  try { return JSON.parse(localStorage.getItem(LS_CATS_ORDER) || 'null'); } catch (e) { return null; }
+}
+function saveCatOrder(ids) { localStorage.setItem(LS_CATS_ORDER, JSON.stringify(ids)); _catsCache = null; }
 function loadCats() {
   if (_catsCache) return _catsCache;
   let custom = [];
   try { custom = JSON.parse(localStorage.getItem(LS_CATS) || '[]'); } catch (e) { custom = []; }
-  _catsCache = [...DEFAULT_EXPENSE_CATS, ...DEFAULT_INCOME_CATS, ...custom];
-  return _catsCache;
+  const ov = loadOverrides();
+  const cats = [...DEFAULT_EXPENSE_CATS, ...DEFAULT_INCOME_CATS, ...custom].map((c) => (ov[c.id] ? { ...c, ...ov[c.id] } : c));
+  const order = loadCatOrder();
+  if (Array.isArray(order)) {
+    const idx = new Map(order.map((id, i) => [id, i]));
+    cats.sort((a, b) => (idx.has(a.id) ? idx.get(a.id) : 99999) - (idx.has(b.id) ? idx.get(b.id) : 99999));
+  }
+  _catsCache = cats;
+  return cats;
 }
 function saveCustomCats(custom) {
   localStorage.setItem(LS_CATS, JSON.stringify(custom));
@@ -554,7 +571,13 @@ function renderTrend(rs) {
 
 /* ================= 设置 ================= */
 function exportData() {
-  const data = { exportedAt: new Date().toISOString(), records: loadRecords(), categories: loadCats() };
+  const data = {
+    exportedAt: new Date().toISOString(),
+    records: loadRecords(),
+    categories: loadCats(),
+    catOverrides: loadOverrides(),
+    catOrder: loadCatOrder()
+  };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -586,6 +609,8 @@ async function importData(file) {
 
     saveRecords(rs);
     saveCustomCats(cats);
+    if (data.catOverrides && typeof data.catOverrides === 'object' && !Array.isArray(data.catOverrides)) saveOverrides(data.catOverrides);
+    if (Array.isArray(data.catOrder)) saveCatOrder(data.catOrder);
     state.month = '';
     state.week = null;
     resetForm();
@@ -622,14 +647,86 @@ function renderBackupHint() {
 function renderCatManage() {
   const box = $('#cat-manage');
   const cats = loadCats();
-  box.innerHTML = cats.map((c) => `
-    <div class="manage-row">
+  box.innerHTML = cats.map((c) => {
+    const nb = catNeighbors(c.id);
+    return `
+    <div class="manage-row" data-edit="${c.id}">
       <span class="item-ic" style="background:${c.color}22;color:${c.color}">${ICONS[c.icon] || ICONS.dots}</span>
       <span class="manage-name">${escapeHtml(c.name)}</span>
       <span class="manage-badge">${c.type === 'expense' ? '支出' : '收入'}</span>
+      <button class="manage-move" data-move="${c.id}" data-dir="-1" ${nb.prev ? '' : 'disabled'} aria-label="上移">↑</button>
+      <button class="manage-move" data-move="${c.id}" data-dir="1" ${nb.next ? '' : 'disabled'} aria-label="下移">↓</button>
       ${c.custom ? `<button class="manage-del" data-del="${c.id}">删除</button>` : ''}
     </div>
+  `;
+  }).join('');
+}
+
+/* 同类型内的相邻分类（调序只在同类型之间进行） */
+function catNeighbors(id) {
+  const cats = loadCats();
+  const me = cats.find((c) => c.id === id);
+  if (!me) return { prev: false, next: false };
+  const same = cats.filter((c) => c.type === me.type);
+  const i = same.findIndex((c) => c.id === id);
+  return { prev: i > 0, next: i < same.length - 1 };
+}
+
+function moveCat(id, delta) {
+  const cats = loadCats();
+  const me = cats.find((c) => c.id === id);
+  if (!me) return;
+  let order = loadCatOrder();
+  if (!Array.isArray(order)) order = cats.map((c) => c.id);
+  const sameTypeIds = order.filter((oid) => {
+    const c = cats.find((x) => x.id === oid);
+    return c && c.type === me.type;
+  });
+  const i = sameTypeIds.indexOf(id);
+  const j = i + delta;
+  if (j < 0 || j >= sameTypeIds.length) return;
+  const gi = order.indexOf(id);
+  const gj = order.indexOf(sameTypeIds[j]);
+  [order[gi], order[gj]] = [order[gj], order[gi]];
+  saveCatOrder(order);
+  renderCatManage();
+  renderCatGrid(false);
+}
+
+/* 编辑分类（名称/图标/颜色，类型不可改） */
+let editCatId = null;
+function renderEcPickers() {
+  $('#ec-icon-picker').innerHTML = Object.keys(ICONS).map((k) => `
+    <button class="icon-opt${catDraft.icon === k ? ' sel' : ''}" data-icon="${k}">${ICONS[k]}</button>
   `).join('');
+  $('#ec-color-picker').innerHTML = COLOR_PALETTE.map((c) => `
+    <button class="color-opt${catDraft.color === c ? ' sel' : ''}" data-color="${c}" style="background:${c}"></button>
+  `).join('');
+}
+function openCatEdit(id) {
+  const c = catById(id);
+  if (!c) return;
+  editCatId = id;
+  $('#ec-name-input').value = c.name;
+  $('#ec-type-label').textContent = c.type === 'expense' ? '支出' : '收入';
+  catDraft.icon = c.icon || 'dots';
+  catDraft.color = c.color;
+  renderEcPickers();
+  $('#ecat-backdrop').classList.remove('hidden');
+}
+function saveCatEdit() {
+  const c = catById(editCatId);
+  if (!c) return;
+  const name = $('#ec-name-input').value.trim();
+  if (!name) { toast('请输入分类名称'); return; }
+  if (loadCats().some((x) => x.id !== editCatId && x.name === name && x.type === c.type)) { toast('这个分类已存在'); return; }
+  const ov = loadOverrides();
+  ov[editCatId] = { ...(ov[editCatId] || {}), name, icon: catDraft.icon, color: catDraft.color };
+  saveOverrides(ov);
+  hideSheet($('#ecat-backdrop'));
+  renderCatManage();
+  renderCatGrid(false);
+  toast('已更新分类');
 }
 
 function openCatModal() {
@@ -656,9 +753,12 @@ function addCategory() {
   if (!name) { toast('请输入分类名称'); return; }
   const type = $('#cat-type-switch').querySelector('.type-btn.active').dataset.type;
   if (loadCats().some((c) => c.name === name && c.type === type)) { toast('这个分类已存在'); return; }
+  const newId = 'c' + uid();
   const custom = JSON.parse(localStorage.getItem(LS_CATS) || '[]');
-  custom.push({ id: 'c' + uid(), name, color: catDraft.color, icon: catDraft.icon, type, custom: true });
+  custom.push({ id: newId, name, color: catDraft.color, icon: catDraft.icon, type, custom: true });
   saveCustomCats(custom);
+  const order = loadCatOrder();
+  if (Array.isArray(order)) { order.push(newId); saveCatOrder(order); }
   toast('已添加分类');
   hideSheet($('#cat-backdrop'));
   renderCatManage();
@@ -792,9 +892,30 @@ function bindEvents() {
   });
   $('#cat-save-btn').addEventListener('click', addCategory);
   $('#cat-manage').addEventListener('click', (e) => {
+    const mv = e.target.closest('.manage-move');
+    if (mv) { moveCat(mv.dataset.move, Number(mv.dataset.dir)); return; }
     const btn = e.target.closest('.manage-del');
-    if (btn) deleteCategory(btn.dataset.del);
+    if (btn) { deleteCategory(btn.dataset.del); return; }
+    const row = e.target.closest('.manage-row');
+    if (row) openCatEdit(row.dataset.edit);
   });
+
+  /* 编辑分类弹层 */
+  $('#ecat-close').addEventListener('click', () => hideSheet($('#ecat-backdrop')));
+  $('#ecat-backdrop').addEventListener('click', (e) => { if (e.target.id === 'ecat-backdrop') hideSheet($('#ecat-backdrop')); });
+  $('#ec-icon-picker').addEventListener('click', (e) => {
+    const opt = e.target.closest('.icon-opt');
+    if (!opt) return;
+    catDraft.icon = opt.dataset.icon;
+    renderEcPickers();
+  });
+  $('#ec-color-picker').addEventListener('click', (e) => {
+    const opt = e.target.closest('.color-opt');
+    if (!opt) return;
+    catDraft.color = opt.dataset.color;
+    renderEcPickers();
+  });
+  $('#ec-save-btn').addEventListener('click', saveCatEdit);
 }
 
 /* ================= 初始化 ================= */

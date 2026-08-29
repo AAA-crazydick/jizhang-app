@@ -553,21 +553,39 @@ input { font-family: inherit; }
 .manage-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   background: #f7f8fa;
   border-radius: 10px;
   padding: 6px 10px;
+  cursor: pointer;
 }
+.manage-row:active { background: #f0f2f5; }
 .manage-row .item-ic { width: 30px; height: 30px; }
 .manage-row .item-ic svg { width: 16px; height: 16px; }
-.manage-name { flex: 1; font-size: 14px; font-weight: 500; }
-.manage-badge { font-size: 11px; color: var(--sub); background: #eceef1; padding: 2px 8px; border-radius: 8px; }
+.manage-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.manage-badge { font-size: 11px; color: var(--sub); background: #eceef1; padding: 2px 8px; border-radius: 8px; flex-shrink: 0; }
+.manage-move {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: #eceef1;
+  color: var(--sub);
+  font-size: 13px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.manage-move:disabled { opacity: 0.25; }
 .manage-del {
   color: var(--expense);
   font-size: 12px;
-  padding: 4px 8px;
+  padding: 4px 6px;
   border-radius: 8px;
+  flex-shrink: 0;
 }
+.type-static { margin-bottom: 2px; }
 
 /* 弹层 */
 .sheet-backdrop {
