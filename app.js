@@ -9,7 +9,7 @@ const LS_CATS_DEL = 'jz_cat_del_v1';    /* 已删除的分类 id（含默认分�
 const LS_LAST_BACKUP = 'jz_last_backup_v1';
 
 /* 应用版本号：每次发布新版本时随部署一起更新 */
-const APP_VERSION = 'v1.10.0';
+const APP_VERSION = 'v1.11.0';
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -147,7 +147,7 @@ const state = {
   catId: null,
   note: '',
   month: '',
-  week: null   /* 明细页当前周页码；null = 打开时定位到今天所在周 */
+  day: null   /* 明细页当前选中日期；null = 打开时定位到今天（不在本月则 1 号） */
 };
 
 /* 编辑弹层使用独立状态，不与主表单互相污染 */
@@ -336,8 +336,8 @@ function shiftMonth(delta) {
   const [y, m] = currentMonth().split('-').map(Number);
   const d = new Date(y, m - 1 + delta, 1);
   state.month = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
-  /* 重置为默认定位：当前月自动回到今天所在周 */
-  state.week = null;
+  /* 重置为默认定位：当前月自动回到今天 */
+  state.day = null;
   renderList();
   renderStats();
   renderMonthTotal();
@@ -358,26 +358,46 @@ function dayLabel(dateStr) {
   return y.getFullYear() === ty.getFullYear() ? label : `${y.getFullYear()}年${label}`;
 }
 
-/* 所选月份按周（周一为首）切页 */
-function monthWeeks(ym) {
-  const [y, m] = ym.split('-').map(Number);
-  const daysInMonth = new Date(y, m, 0).getDate();
-  const offset = (new Date(y, m - 1, 1).getDay() + 6) % 7;
-  const weeks = [];
-  for (let start = 1 - offset; start <= daysInMonth; start += 7) {
-    weeks.push({ from: Math.max(1, start), to: Math.min(daysInMonth, start + 6) });
-  }
-  return weeks;
+/* 月历点选（方案1）：点日期看当天账目 */
+function defaultDay(ym) {
+  const today = nowParts().date;
+  return today.startsWith(ym) ? today : `${ym}-01`;
 }
 
-function defaultWeek(ym, weeks) {
+function renderCal(ym, monthRs) {
+  const [y, m] = ym.split('-').map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const leading = (new Date(y, m - 1, 1).getDay() + 6) % 7;
+  const trailing = (7 - ((leading + daysInMonth) % 7)) % 7;
+  const per = {};
+  monthRs.forEach((r) => {
+    if (!r.date) return;
+    const o = per[r.date] || (per[r.date] = { e: 0, i: 0 });
+    if (r.type === 'expense') o.e += r.amount; else o.i += r.amount;
+  });
   const today = nowParts().date;
-  if (today.startsWith(ym)) {
-    const d = Number(today.slice(8, 10));
-    const i = weeks.findIndex((w) => d >= w.from && d <= w.to);
-    if (i > -1) return i;
+  const prevDays = new Date(y, m - 1, 0).getDate();
+  const cells = [];
+  for (let i = leading; i > 0; i--) cells.push(`<div class="cd mute"><b>${prevDays - i + 1}</b></div>`);
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ymd = `${ym}-${pad(d)}`;
+    const o = per[ymd];
+    const e = o ? o.e : 0;
+    const inc = o ? o.i : 0;
+    let tag = '';
+    if (inc > e) tag = `<small class="in">+${trimAmount(inc - e)}</small>`;
+    else if (e > 0) tag = `<small>${trimAmount(e)}</small>`;
+    cells.push(`<button class="cd${ymd === today ? ' today' : ''}${state.day === ymd ? ' sel' : ''}" data-day="${ymd}"><b>${d}</b>${tag}</button>`);
   }
-  return 0;
+  for (let i = 1; i <= trailing; i++) cells.push(`<div class="cd mute"><b>${i}</b></div>`);
+  $('#cal-days').innerHTML = cells.join('');
+}
+
+/* 紧凑金额：日历标注里省宽度 */
+function trimAmount(n) {
+  if (n >= 10000) return (n / 10000).toFixed(1).replace(/\.0$/, '') + '万';
+  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+  return String(round2(n));
 }
 
 function searchFilter(rs, q) {
@@ -393,68 +413,48 @@ function renderList() {
   $('#month-label-list').textContent = monthLabel(ym);
   const q = $('#search-input').value.trim().toLowerCase();
   const monthRs = loadRecords().filter((r) => (r.date || '').startsWith(ym));
-  const weeks = monthWeeks(ym);
-  if (state.week === null || state.week === undefined) state.week = defaultWeek(ym, weeks);
-  if (state.week >= weeks.length) state.week = weeks.length - 1;
-
-  /* 月度汇总（跟随搜索过滤） */
   const qMonth = searchFilter(monthRs, q);
+
   $('#sum-expense').textContent = fmtMoney(qMonth.filter((r) => r.type === 'expense').reduce((s, r) => s + r.amount, 0));
   $('#sum-income').textContent = fmtMoney(qMonth.filter((r) => r.type === 'income').reduce((s, r) => s + r.amount, 0));
 
-  const navEl = $('#week-nav');
-  let pageRs;
-  if (q) {
-    /* 搜索时跨周显示全部结果 */
-    pageRs = qMonth;
-    navEl.classList.add('searching');
-    $('#week-label').textContent = `搜索到 ${pageRs.length} 条`;
-    $('#week-expense').textContent = '';
-  } else {
-    if (state.week < 0) state.week = 0;
-    const wk = weeks[state.week];
-    pageRs = monthRs.filter((r) => {
-      const d = Number((r.date || '').slice(8, 10));
-      return d >= wk.from && d <= wk.to;
-    });
-    navEl.classList.remove('searching');
-    $('#week-label').textContent = `第 ${state.week + 1}/${weeks.length} 周 · ${Number(ym.slice(5, 7))}月${wk.from}日–${wk.to}日`;
-    const wkExp = pageRs.filter((r) => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
-    $('#week-expense').textContent = `本周支出 ${fmtMoney(wkExp)}`;
-    $('#prev-week').disabled = state.week === 0;
-    $('#next-week').disabled = state.week === weeks.length - 1;
-  }
+  renderCal(ym, monthRs);
+  const searching = q.length > 0;
+  $('#cal-box').classList.toggle('hidden', searching);
 
   const body = $('#list-body');
+  let pageRs;
+  if (searching) {
+    /* 搜索时跨天显示整月结果 */
+    pageRs = qMonth;
+    $('#day-title').innerHTML = `搜索结果<small>整月 ${pageRs.length} 条</small>`;
+    $('#day-sum').textContent = '';
+    $('#day-sum').classList.remove('in');
+  } else {
+    if (!state.day || !state.day.startsWith(ym)) state.day = defaultDay(ym);
+    pageRs = monthRs.filter((r) => r.date === state.day);
+    $('#day-title').innerHTML = `${Number(state.day.slice(5, 7))}月${Number(state.day.slice(8, 10))}日<small>${dayLabel(state.day)}</small>`;
+    const dExp = pageRs.filter((r) => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+    const dInc = pageRs.filter((r) => r.type === 'income').reduce((s, r) => s + r.amount, 0);
+    const sumEl = $('#day-sum');
+    if (dInc > dExp && dInc > 0) {
+      sumEl.textContent = `收入 ${fmtMoney(dInc)}`;
+      sumEl.classList.add('in');
+    } else if (dExp > 0) {
+      sumEl.textContent = `支出 ${fmtMoney(dExp)}`;
+      sumEl.classList.remove('in');
+    } else {
+      sumEl.textContent = '';
+      sumEl.classList.remove('in');
+    }
+  }
+
   if (!pageRs.length) {
-    body.innerHTML = `<div class="empty">${q ? '没有匹配的记录' : '这一周还没有记录<br>去「记账」页记一笔吧'}</div>`;
+    body.innerHTML = `<div class="empty">${searching ? '没有匹配的记录' : '这一天还没有记录<br>去「记账」页记一笔吧'}</div>`;
     return;
   }
   pageRs.sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time) || (b.createdAt || 0) - (a.createdAt || 0));
-  const groups = {};
-  pageRs.forEach((r) => { (groups[r.date] = groups[r.date] || []).push(r); });
-  body.innerHTML = Object.keys(groups).map((date) => {
-    const dayExp = groups[date].filter((r) => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
-    return `
-    <div class="list-group">
-      <div class="list-date"><span>${dayLabel(date)}</span>${dayExp > 0 ? `<b class="day-sum">支出 ${fmtMoney(dayExp)}</b>` : ''}</div>
-      ${groups[date].map(itemHTML).join('')}
-    </div>
-  `;
-  }).join('');
-}
-
-/* 周翻页：切换后按方向播放翻页动画 */
-function shiftWeek(delta) {
-  const weeks = monthWeeks(currentMonth());
-  const next = state.week + delta;
-  if (next < 0 || next >= weeks.length) return;
-  state.week = next;
-  renderList();
-  const body = $('#list-body');
-  body.classList.remove('flip-left', 'flip-right');
-  void body.offsetWidth;
-  body.classList.add(delta > 0 ? 'flip-left' : 'flip-right');
+  body.innerHTML = pageRs.map(itemHTML).join('');
 }
 
 function itemHTML(r) {
@@ -509,7 +509,7 @@ async function deleteEditing() {
   renderBackupHint();
 }
 
-/* ================= 统计 ================= */
+/* ================= 统计（方案2：流向 + 双环 + 曲线） ================= */
 function renderStats() {
   const ym = currentMonth();
   $('#month-label-stats').textContent = monthLabel(ym);
@@ -522,9 +522,26 @@ function renderStats() {
   $('#stat-expense').textContent = fmtMoney(expSum);
   $('#stat-balance').textContent = fmtMoney(incSum - expSum);
 
-  renderBreakdown('expense', exp, expSum, $('#expense-donut'), $('#expense-legend'));
-  renderBreakdown('income', inc, incSum, $('#income-donut'), $('#income-legend'));
-  renderTrend(rs);
+  renderFlow(incSum, expSum);
+  renderBreakdown(exp, expSum, $('#expense-donut'), $('#expense-legend'));
+  renderBreakdown(inc, incSum, $('#income-donut'), $('#income-legend'));
+  renderCurve(ym, exp);
+}
+
+/* 收支流向条：收入/支出按比例拼接，读出储蓄率 */
+function renderFlow(inSum, expSum) {
+  const total = inSum + expSum;
+  $('#flow-in').style.width = total > 0 ? `${inSum / total * 100}%` : '50%';
+  $('#flow-ex').style.width = total > 0 ? `${expSum / total * 100}%` : '50%';
+  $('#flow-in-label').textContent = `收入 ${fmtMoney(inSum)}`;
+  $('#flow-ex-label').textContent = `支出 ${fmtMoney(expSum)}`;
+  if (inSum > 0) {
+    $('#flow-note').textContent = `每收入 100 元，支出 ${Math.min(999, Math.round(expSum / inSum * 100))} 元`;
+    $('#flow-rate').textContent = `储蓄率 ${Math.round((inSum - expSum) / inSum * 100)}%`;
+  } else {
+    $('#flow-note').textContent = '本月暂无收入';
+    $('#flow-rate').textContent = '';
+  }
 }
 
 function breakdown(records) {
@@ -533,12 +550,11 @@ function breakdown(records) {
   return Object.keys(map).map((cat) => ({ cat, sum: round2(map[cat]) })).sort((a, b) => b.sum - a.sum);
 }
 
-function renderBreakdown(type, records, total, donutEl, legendEl) {
+function renderBreakdown(records, total, donutEl, legendEl) {
   if (!records.length || total <= 0) {
-    donutEl.classList.remove('pie');
     donutEl.style.removeProperty('--pie');
-    donutEl.innerHTML = '<div class="donut-center"><b>--</b><span>暂无</span></div>';
-    legendEl.innerHTML = '<div class="empty">暂无记录</div>';
+    donutEl.innerHTML = '<div class="c"><b>--</b><span>暂无</span></div>';
+    legendEl.innerHTML = '<div class="empty" style="padding:8px 0">暂无</div>';
     return;
   }
   const items = breakdown(records);
@@ -549,54 +565,45 @@ function renderBreakdown(type, records, total, donutEl, legendEl) {
     const end = acc * 360;
     return `${catOrUnknown(it.cat).color} ${start}deg ${end}deg`;
   }).join(',');
-  donutEl.classList.add('pie');
   donutEl.style.setProperty('--pie', `conic-gradient(${stops})`);
-  /* 总数已在英雄卡展示，环心留空 */
-  donutEl.innerHTML = '';
+  donutEl.innerHTML = `<div class="c"><b>${fmtMoney(total)}</b><span>${items.length} 类</span></div>`;
   legendEl.innerHTML = items.map((it) => {
     const c = catOrUnknown(it.cat);
-    return `<div class="legend-item">
-      <span class="legend-dot" style="background:${c.color}"></span>
-      <span class="legend-name">${escapeHtml(c.name)}</span>
-      <span class="legend-val">${fmtMoney(it.sum).slice(1)}</span>
-    </div>`;
+    return `<div class="li"><i style="background:${c.color}"></i><span>${escapeHtml(c.name)}</span><b>${Math.round(it.sum / total * 100)}%</b></div>`;
   }).join('');
 }
 
-/* 所选月份的每日支出柱状图（跟随月份切换） */
-function renderTrend(rs) {
-  const ym = currentMonth();
+/* 每日支出平滑趋势曲线（跟随月份切换，峰值红点标注） */
+function renderCurve(ym, exp) {
   const [y, m] = ym.split('-').map(Number);
-  const daysInMonth = new Date(y, m, 0).getDate();
-  const today = nowParts().date;
-  const days = [];
-  for (let i = 1; i <= daysInMonth; i++) {
-    days.push({ ymd: `${ym}-${pad(i)}`, label: String(i), sum: 0 });
-  }
-  rs.filter((r) => r.type === 'expense').forEach((r) => {
-    const day = days.find((x) => x.ymd === r.date);
-    if (day) day.sum += r.amount;
-  });
-  const max = Math.max(...days.map((d) => d.sum), 0);
-  const trend = $('#trend');
+  const n = new Date(y, m, 0).getDate();
+  const per = {};
+  exp.forEach((r) => { if (r.date) per[r.date] = (per[r.date] || 0) + r.amount; });
+  const vals = [];
+  for (let d = 1; d <= n; d++) vals.push(per[`${ym}-${pad(d)}`] || 0);
+  const max = Math.max(...vals, 0);
+  const svg = $('#curve-svg');
+  const sub = $('#curve-sub');
   if (max <= 0) {
-    trend.innerHTML = '<div class="empty" style="padding:20px 0;width:100%">本月暂无支出</div>';
+    svg.innerHTML = '';
+    sub.textContent = '本月暂无支出';
     return;
   }
-  /* 31 根柱子放不下每根的数值和日期：只标注最高日、当天，以及 1/6/11...号和月末 */
-  const showLabel = (i) => i % 5 === 1 || i === daysInMonth;
-  trend.innerHTML = days.map((d, idx) => {
-    const i = idx + 1;
-    const isMax = d.sum > 0 && d.sum === max;
-    const showVal = isMax || (d.ymd === today && d.sum > 0);
-    return `
-    <div class="trend-day">
-      <span class="trend-val">${showVal ? fmtMoney(d.sum).slice(1) : ''}</span>
-      <div class="trend-bar${isMax ? ' high' : ''}" style="--i:${idx};height:${Math.max(3, d.sum / max * 56)}px"></div>
-      <span class="trend-label">${showLabel(i) ? d.label : ''}</span>
-    </div>
-  `;
+  const peak = vals.indexOf(max);
+  const X = (i) => 5 + (i / (n - 1)) * 320;
+  const Y = (v) => 104 - (v / max) * 92;
+  let d = `M ${X(0).toFixed(1)} ${Y(vals[0]).toFixed(1)}`;
+  for (let i = 1; i < n; i++) d += ` L ${X(i).toFixed(1)} ${Y(vals[i]).toFixed(1)}`;
+  const dots = vals.map((v, i) => {
+    if (v <= 0) return '';
+    const fill = i === peak ? '#fa5151' : '#0a9d6a';
+    const halo = i === peak ? `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="6.5" fill="#fa5151" opacity=".2"/>` : '';
+    return `${halo}<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="3" fill="${fill}"/>`;
   }).join('');
+  svg.innerHTML = `<defs><linearGradient id="cfill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0a9d6a" stop-opacity=".22"/><stop offset="1" stop-color="#0a9d6a" stop-opacity="0"/></linearGradient></defs>
+    <path d="${d} L ${X(n - 1).toFixed(1)} 106 L ${X(0).toFixed(1)} 106 Z" fill="url(#cfill)"/>
+    <path d="${d}" fill="none" stroke="#0a9d6a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>${dots}`;
+  sub.textContent = `峰值 ${m}/${peak + 1} ${fmtMoney(max)} · 日均 ${fmtMoney(round2(exp.reduce((s, r) => s + r.amount, 0) / n))}`;
 }
 
 /* ================= 设置 ================= */
@@ -644,7 +651,7 @@ async function importData(file) {
     if (Array.isArray(data.catOrder)) saveCatOrder(data.catOrder);
     if (Array.isArray(data.catDeleted)) saveDeletedCats(data.catDeleted);
     state.month = '';
-    state.week = null;
+    state.day = null;
     resetForm();
     renderList();
     renderStats();
@@ -885,23 +892,16 @@ function bindEvents() {
   $('#next-month-stats').addEventListener('click', () => shiftMonth(1));
   $('#search-input').addEventListener('input', renderList);
 
-  $('#prev-week').addEventListener('click', () => shiftWeek(-1));
-  $('#next-week').addEventListener('click', () => shiftWeek(1));
-
-  /* 明细页左右滑动翻周 */
-  let touchX = null, touchY = null;
-  const listView = $('#view-list');
-  listView.addEventListener('touchstart', (e) => {
-    touchX = e.touches[0].clientX;
-    touchY = e.touches[0].clientY;
-  }, { passive: true });
-  listView.addEventListener('touchend', (e) => {
-    if (touchX === null) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - touchX;
-    const dy = t.clientY - touchY;
-    touchX = null;
-    if (Math.abs(dx) > 56 && Math.abs(dx) > Math.abs(dy) * 1.5) shiftWeek(dx < 0 ? 1 : -1);
+  /* 明细日历：点日期切换当天账目（带翻页动画） */
+  $('#cal-days').addEventListener('click', (e) => {
+    const cell = e.target.closest('.cd[data-day]');
+    if (!cell || cell.dataset.day === state.day) return;
+    state.day = cell.dataset.day;
+    renderList();
+    const body = $('#list-body');
+    body.classList.remove('flip-left', 'flip-right');
+    void body.offsetWidth;
+    body.classList.add('flip-left');
   });
 
   $('#edit-close').addEventListener('click', closeEdit);
@@ -922,7 +922,7 @@ function bindEvents() {
     if (!(await showConfirm(`确定清空所有记账记录吗？共 ${n} 条，此操作不可恢复，建议先导出备份。`, '清空'))) return;
     saveRecords([]);
     state.month = '';
-    state.week = null;
+    state.day = null;
     resetForm();
     renderList();
     renderStats();

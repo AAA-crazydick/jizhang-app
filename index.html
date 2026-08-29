@@ -77,17 +77,14 @@
           <div class="chip income">收入 <b id="sum-income">¥0.00</b></div>
         </div>
 
-        <div class="week-nav" id="week-nav">
-          <button class="week-btn" id="prev-week" aria-label="上一周">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-          </button>
-          <div class="week-info">
-            <span class="week-label" id="week-label"></span>
-            <span class="week-expense" id="week-expense"></span>
-          </div>
-          <button class="week-btn" id="next-week" aria-label="下一周">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-          </button>
+        <div class="card cal-box" id="cal-box">
+          <div class="wk-row"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+          <div class="cal-days" id="cal-days"></div>
+        </div>
+
+        <div class="dhd">
+          <div class="t" id="day-title"></div>
+          <div class="s" id="day-sum"></div>
         </div>
 
         <div id="list-body" class="list-body"></div>
@@ -105,39 +102,39 @@
           </button>
         </div>
 
-        <div class="hero-card">
-          <div class="hero-balance">
-            <span class="hero-label">本月结余</span>
-            <b class="hero-value" id="stat-balance">¥0.00</b>
-          </div>
-          <div class="hero-row">
-            <div class="hero-col"><span>收入</span><b id="stat-income">¥0.00</b></div>
-            <div class="hero-col"><span>支出</span><b id="stat-expense">¥0.00</b></div>
+        <div class="strip">
+          <div class="b"><small>本月结余</small><b id="stat-balance">¥0.00</b></div>
+          <div class="io">
+            <div class="i"><small>收入</small><span id="stat-income">¥0.00</span></div>
+            <div class="e"><small>支出</small><span id="stat-expense">¥0.00</span></div>
           </div>
         </div>
 
-        <div class="card">
-          <div class="donut-duo">
-            <div class="donut-block">
-              <div class="donut-block-title">支出分类占比</div>
-              <div class="donut-flex">
-                <div class="donut" id="expense-donut"></div>
-                <div class="legend-mini" id="expense-legend"></div>
-              </div>
-            </div>
-            <div class="donut-block">
-              <div class="donut-block-title">收入分类占比</div>
-              <div class="donut-flex">
-                <div class="donut" id="income-donut"></div>
-                <div class="legend-mini" id="income-legend"></div>
-              </div>
-            </div>
+        <div class="card flow">
+          <h3>收支流向</h3>
+          <div class="labels"><span id="flow-in-label">收入 ¥0.00</span><span id="flow-ex-label">支出 ¥0.00</span></div>
+          <div class="bar"><div class="in" id="flow-in" style="width:50%"></div><div class="ex" id="flow-ex" style="width:50%"></div></div>
+          <div class="pct"><span id="flow-note"></span><span id="flow-rate"></span></div>
+        </div>
+
+        <div class="duo">
+          <div class="dcard">
+            <h4>支出构成</h4>
+            <div class="donut" id="expense-donut"></div>
+            <div class="lg" id="expense-legend"></div>
+          </div>
+          <div class="dcard">
+            <h4>收入构成</h4>
+            <div class="donut" id="income-donut"></div>
+            <div class="lg" id="income-legend"></div>
           </div>
         </div>
 
-        <div class="card">
-          <h3>本月每日支出</h3>
-          <div class="trend" id="trend"></div>
+        <div class="card curve">
+          <h3>每日支出趋势</h3>
+          <div class="sub" id="curve-sub"></div>
+          <svg id="curve-svg" viewBox="0 0 330 110" preserveAspectRatio="none"></svg>
+          <div class="xl"><span>1</span><span>6</span><span>11</span><span>16</span><span>21</span><span>26</span><span>31</span></div>
         </div>
       </section>
 
