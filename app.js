@@ -5,10 +5,11 @@ const LS_RECORDS = 'jz_records_v1';
 const LS_CATS = 'jz_custom_cats_v1';
 const LS_CATS_OV = 'jz_cat_ov_v1';      /* 对任意分类（含默认）的改名/图标/颜色覆盖 */
 const LS_CATS_ORDER = 'jz_cat_order_v1'; /* 分类显示顺序 */
+const LS_CATS_DEL = 'jz_cat_del_v1';    /* 已删除的分类 id（含默认分类） */
 const LS_LAST_BACKUP = 'jz_last_backup_v1';
 
 /* 应用版本号：每次发布新版本时随部署一起更新 */
-const APP_VERSION = 'v1.9.0';
+const APP_VERSION = 'v1.10.0';
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -108,12 +109,19 @@ function loadCatOrder() {
   try { return JSON.parse(localStorage.getItem(LS_CATS_ORDER) || 'null'); } catch (e) { return null; }
 }
 function saveCatOrder(ids) { localStorage.setItem(LS_CATS_ORDER, JSON.stringify(ids)); _catsCache = null; }
+function loadDeletedCats() {
+  try { return JSON.parse(localStorage.getItem(LS_CATS_DEL) || '[]'); } catch (e) { return []; }
+}
+function saveDeletedCats(ids) { localStorage.setItem(LS_CATS_DEL, JSON.stringify(ids)); _catsCache = null; }
 function loadCats() {
   if (_catsCache) return _catsCache;
   let custom = [];
   try { custom = JSON.parse(localStorage.getItem(LS_CATS) || '[]'); } catch (e) { custom = []; }
+  const del = new Set(loadDeletedCats());
   const ov = loadOverrides();
-  const cats = [...DEFAULT_EXPENSE_CATS, ...DEFAULT_INCOME_CATS, ...custom].map((c) => (ov[c.id] ? { ...c, ...ov[c.id] } : c));
+  const cats = [...DEFAULT_EXPENSE_CATS, ...DEFAULT_INCOME_CATS, ...custom]
+    .filter((c) => !del.has(c.id))
+    .map((c) => (ov[c.id] ? { ...c, ...ov[c.id] } : c));
   const order = loadCatOrder();
   if (Array.isArray(order)) {
     const idx = new Map(order.map((id, i) => [id, i]));
@@ -598,7 +606,8 @@ function exportData() {
     records: loadRecords(),
     categories: loadCats(),
     catOverrides: loadOverrides(),
-    catOrder: loadCatOrder()
+    catOrder: loadCatOrder(),
+    catDeleted: loadDeletedCats()
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
@@ -633,6 +642,7 @@ async function importData(file) {
     saveCustomCats(cats);
     if (data.catOverrides && typeof data.catOverrides === 'object' && !Array.isArray(data.catOverrides)) saveOverrides(data.catOverrides);
     if (Array.isArray(data.catOrder)) saveCatOrder(data.catOrder);
+    if (Array.isArray(data.catDeleted)) saveDeletedCats(data.catDeleted);
     state.month = '';
     state.week = null;
     resetForm();
@@ -679,7 +689,7 @@ function renderCatManage() {
       <span class="manage-badge">${c.type === 'expense' ? '支出' : '收入'}</span>
       <button class="manage-move" data-move="${c.id}" data-dir="-1" ${nb.prev ? '' : 'disabled'} aria-label="上移">↑</button>
       <button class="manage-move" data-move="${c.id}" data-dir="1" ${nb.next ? '' : 'disabled'} aria-label="下移">↓</button>
-      ${c.custom ? `<button class="manage-del" data-del="${c.id}">删除</button>` : ''}
+      <button class="manage-del" data-del="${c.id}">删除</button>
     </div>
   `;
   };
@@ -796,14 +806,28 @@ function addCategory() {
   renderCatGrid(false);
 }
 async function deleteCategory(id) {
-  const used = loadRecords().some((r) => r.category === id);
-  if (used) { toast('该分类已有记录，无法删除'); return; }
   const c = catById(id);
-  if (!(await showConfirm(`确定删除分类「${c ? c.name : ''}」吗？`, '删除'))) return;
+  if (!c) return;
+  const usedCount = loadRecords().filter((r) => r.category === id).length;
+  let msg = `确定删除分类「${c.name}」吗？`;
+  if (usedCount > 0) {
+    msg = `「${c.name}」有 ${usedCount} 条记录，删除后这些记录将显示为「未知分类」，点击记录可重新指定分类。确定删除吗？`;
+  }
+  const sameType = loadCats().filter((x) => x.type === c.type);
+  if (sameType.length <= 1) {
+    msg = `「${c.name}」是最后一个${c.type === 'expense' ? '支出' : '收入'}分类，删除后将无法记${c.type === 'expense' ? '支出' : '收入'}账（需重新添加分类）。确定删除吗？`;
+  }
+  if (!(await showConfirm(msg, '删除'))) return;
   const custom = JSON.parse(localStorage.getItem(LS_CATS) || '[]').filter((x) => x.id !== id);
   saveCustomCats(custom);
+  const del = loadDeletedCats();
+  if (!del.includes(id)) { del.push(id); saveDeletedCats(del); }
+  const order = loadCatOrder();
+  if (Array.isArray(order) && order.includes(id)) saveCatOrder(order.filter((x) => x !== id));
+  if (state.catId === id) { state.catId = null; renderCatGrid(false); }
+  if (editState.catId === id) { editState.catId = null; if (editState.id) renderCatGrid(true); }
   renderCatManage();
-  renderCatGrid(false);
+  renderMonthTotal();
   toast('已删除分类');
 }
 
