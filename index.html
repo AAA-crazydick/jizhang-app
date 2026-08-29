@@ -101,18 +101,14 @@
           </button>
         </div>
 
-        <div class="stat-cards">
-          <div class="stat-card">
-            <span class="stat-label income-text">收入</span>
-            <b class="stat-value income-text" id="stat-income">¥0.00</b>
+        <div class="hero-card">
+          <div class="hero-balance">
+            <span class="hero-label">本月结余</span>
+            <b class="hero-value" id="stat-balance">¥0.00</b>
           </div>
-          <div class="stat-card">
-            <span class="stat-label expense-text">支出</span>
-            <b class="stat-value expense-text" id="stat-expense">¥0.00</b>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">结余</span>
-            <b class="stat-value" id="stat-balance">¥0.00</b>
+          <div class="hero-row">
+            <div class="hero-col"><span>收入</span><b id="stat-income">¥0.00</b></div>
+            <div class="hero-col"><span>支出</span><b id="stat-expense">¥0.00</b></div>
           </div>
         </div>
 
@@ -133,7 +129,7 @@
         </div>
 
         <div class="card">
-          <h3>近 7 天支出</h3>
+          <h3>本月每日支出</h3>
           <div class="trend" id="trend"></div>
         </div>
       </section>
@@ -147,6 +143,7 @@
             <button class="setting-btn" id="import-btn">导入备份</button>
             <input type="file" id="import-file" accept="application/json,.json" hidden>
           </div>
+          <p class="hint backup-hint" id="backup-hint"></p>
           <p class="hint">数据保存在手机浏览器本地。建议定期导出备份，换手机或清理浏览器缓存前先导出。</p>
         </div>
 
@@ -174,19 +171,23 @@
 
     <nav class="tabbar">
       <button class="tab active" data-view="record">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        <svg class="ic-line" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        <svg class="ic-fill" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
         <span>记账</span>
       </button>
       <button class="tab" data-view="list">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>
+        <svg class="ic-line" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>
+        <svg class="ic-fill" viewBox="0 0 24 24" fill="currentColor"><rect x="3.5" y="5.5" width="17" height="2.6" rx="1.3"/><rect x="3.5" y="10.7" width="17" height="2.6" rx="1.3"/><rect x="3.5" y="15.9" width="11" height="2.6" rx="1.3"/></svg>
         <span>明细</span>
       </button>
       <button class="tab" data-view="stats">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+        <svg class="ic-line" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+        <svg class="ic-fill" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="12.5" width="3.6" height="7.5" rx="1.2"/><rect x="10.2" y="7.5" width="3.6" height="12.5" rx="1.2"/><rect x="16.4" y="10" width="3.6" height="10" rx="1.2"/></svg>
         <span>统计</span>
       </button>
       <button class="tab" data-view="settings">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <svg class="ic-line" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <svg class="ic-fill" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
         <span>设置</span>
       </button>
     </nav>
@@ -262,6 +263,18 @@
       <div class="color-picker" id="color-picker"></div>
       <div class="edit-actions">
         <button class="save-btn flex-1" id="cat-save-btn">添加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 确认弹层（代替原生 confirm） -->
+  <div class="sheet-backdrop hidden" id="confirm-backdrop">
+    <div class="sheet confirm-sheet">
+      <h2 class="confirm-title">确认操作</h2>
+      <p class="confirm-msg" id="confirm-msg"></p>
+      <div class="edit-actions">
+        <button class="setting-btn confirm-cancel" id="confirm-cancel">取消</button>
+        <button class="confirm-ok danger" id="confirm-ok">确认</button>
       </div>
     </div>
   </div>
