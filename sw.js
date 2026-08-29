@@ -1,4 +1,4 @@
-const CACHE = 'jz-cache-v8';
+const CACHE = 'jz-cache-v9';
 const ASSETS = [
   './',
   './index.html',

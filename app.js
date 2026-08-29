@@ -7,6 +7,9 @@ const LS_CATS_OV = 'jz_cat_ov_v1';      /* 对任意分类（含默认）的改�
 const LS_CATS_ORDER = 'jz_cat_order_v1'; /* 分类显示顺序 */
 const LS_LAST_BACKUP = 'jz_last_backup_v1';
 
+/* 应用版本号：每次发布新版本时随部署一起更新 */
+const APP_VERSION = 'v1.8.0';
+
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
 
@@ -931,6 +934,8 @@ function init() {
   const n = nowParts();
   $('#date-input').value = n.date;
   $('#time-input').value = n.time;
+  const verEl = $('#app-version');
+  if (verEl) verEl.textContent = `当前版本 ${APP_VERSION}`;
   bindEvents();
   renderCatGrid(false);
   renderList();
