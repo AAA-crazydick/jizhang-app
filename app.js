@@ -647,7 +647,7 @@ function renderBackupHint() {
 function renderCatManage() {
   const box = $('#cat-manage');
   const cats = loadCats();
-  box.innerHTML = cats.map((c) => {
+  const row = (c) => {
     const nb = catNeighbors(c.id);
     return `
     <div class="manage-row" data-edit="${c.id}">
@@ -659,7 +659,15 @@ function renderCatManage() {
       ${c.custom ? `<button class="manage-del" data-del="${c.id}">删除</button>` : ''}
     </div>
   `;
-  }).join('');
+  };
+  /* 支出、收入完全分成两个分区，各自内部排序 */
+  const exp = cats.filter((c) => c.type === 'expense');
+  const inc = cats.filter((c) => c.type === 'income');
+  box.innerHTML =
+    '<div class="manage-section-title">支出分类</div>' +
+    exp.map(row).join('') +
+    '<div class="manage-section-title">收入分类</div>' +
+    inc.map(row).join('');
 }
 
 /* 同类型内的相邻分类（调序只在同类型之间进行） */
