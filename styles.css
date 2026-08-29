@@ -546,6 +546,8 @@ input { font-family: inherit; }
 .hint.warn { color: #e6782a; font-weight: 500; }
 .backup-hint:empty { display: none; }
 .footer-note { text-align: center; font-size: 12px; color: #b6bdc9; padding: 8px 0 2px; }
+.footer-meta { text-align: center; font-size: 11px; color: #b6bdc9; padding: 2px 0 0; line-height: 1.7; }
+.footer-meta a { color: #9aa3b2; text-decoration: none; letter-spacing: 0.2px; }
 
 #cat-manage { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
 .manage-row {
