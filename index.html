@@ -31,39 +31,30 @@
         </div>
 
         <div class="amount-box">
-          <span class="currency">¥</span>
-          <span class="amount" id="amount-display">0.00</span>
+          <div class="cap"><span class="tag" id="amount-tag">支出</span><span>本月累计 <b id="month-total">¥0.00</b></span></div>
+          <div class="num"><span class="currency">¥</span><span class="amount" id="amount-display">0.00</span></div>
         </div>
 
-        <div class="section-title">分类</div>
+        <div class="section-title cat-sec">分类<em id="cat-more-hint"></em></div>
         <div class="cat-grid" id="cat-grid"></div>
 
-        <div class="section-title">具体内容</div>
-        <input class="note-input" id="note-input" type="text" placeholder="备注：这笔钱花在哪 / 收入来源" autocomplete="off">
-
-        <div class="datetime-row">
+        <div class="meta-row">
+          <input class="note-input" id="note-input" type="text" placeholder="备注…" autocomplete="off">
           <input type="date" id="date-input">
           <input type="time" id="time-input">
         </div>
 
         <div class="keypad-wrap">
           <div class="keypad" id="keypad">
-            <button class="key" data-key="1">1</button>
-            <button class="key" data-key="2">2</button>
-            <button class="key" data-key="3">3</button>
-            <button class="key" data-key="4">4</button>
-            <button class="key" data-key="5">5</button>
-            <button class="key" data-key="6">6</button>
-            <button class="key" data-key="7">7</button>
-            <button class="key" data-key="8">8</button>
-            <button class="key" data-key="9">9</button>
-            <button class="key" data-key=".">.</button>
-            <button class="key" data-key="0">0</button>
-            <button class="key del" data-key="del" aria-label="退格">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><path d="M18 9l-6 6"/><path d="M12 9l6 6"/></svg>
+            <button class="key" data-key="1">1</button><button class="key" data-key="2">2</button><button class="key" data-key="3">3</button>
+            <button class="save-key" id="save-btn">保存</button>
+            <button class="key" data-key="4">4</button><button class="key" data-key="5">5</button><button class="key" data-key="6">6</button>
+            <button class="key" data-key="7">7</button><button class="key" data-key="8">8</button><button class="key" data-key="9">9</button>
+            <button class="key" data-key=".">.</button><button class="key" data-key="0">0</button>
+            <button class="key" data-key="del" aria-label="退格">
+              <svg class="del" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><path d="M18 9l-6 6"/><path d="M12 9l6 6"/></svg>
             </button>
           </div>
-          <button class="save-btn" id="save-btn">保存</button>
         </div>
       </section>
 
@@ -235,24 +226,17 @@
         <input type="time" id="edit-time-input">
       </div>
       <div class="keypad" id="edit-keypad">
-        <button class="key" data-key="1">1</button>
-        <button class="key" data-key="2">2</button>
-        <button class="key" data-key="3">3</button>
-        <button class="key" data-key="4">4</button>
-        <button class="key" data-key="5">5</button>
-        <button class="key" data-key="6">6</button>
-        <button class="key" data-key="7">7</button>
-        <button class="key" data-key="8">8</button>
-        <button class="key" data-key="9">9</button>
-        <button class="key" data-key=".">.</button>
-        <button class="key" data-key="0">0</button>
-        <button class="key del" data-key="del" aria-label="退格">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><path d="M18 9l-6 6"/><path d="M12 9l6 6"/></svg>
+        <button class="key" data-key="1">1</button><button class="key" data-key="2">2</button><button class="key" data-key="3">3</button>
+        <button class="save-key" id="edit-save-btn">保存</button>
+        <button class="key" data-key="4">4</button><button class="key" data-key="5">5</button><button class="key" data-key="6">6</button>
+        <button class="key" data-key="7">7</button><button class="key" data-key="8">8</button><button class="key" data-key="9">9</button>
+        <button class="key" data-key=".">.</button><button class="key" data-key="0">0</button>
+        <button class="key" data-key="del" aria-label="退格">
+          <svg class="del" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><path d="M18 9l-6 6"/><path d="M12 9l6 6"/></svg>
         </button>
       </div>
       <div class="edit-actions">
-        <button class="danger-btn" id="edit-delete-btn">删除</button>
-        <button class="save-btn flex-1" id="edit-save-btn">保存修改</button>
+        <button class="danger-btn" id="edit-delete-btn">删除这笔记录</button>
       </div>
     </div>
   </div>

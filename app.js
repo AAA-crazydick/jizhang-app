@@ -8,7 +8,7 @@ const LS_CATS_ORDER = 'jz_cat_order_v1'; /* 分类显示顺序 */
 const LS_LAST_BACKUP = 'jz_last_backup_v1';
 
 /* 应用版本号：每次发布新版本时随部署一起更新 */
-const APP_VERSION = 'v1.8.0';
+const APP_VERSION = 'v1.9.0';
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -213,6 +213,7 @@ function setType(type, editMode) {
   s.type = type;
   if (!catsByType(type).some((c) => c.id === s.catId)) s.catId = null;
   renderCatGrid(editMode);
+  if (!editMode) renderMonthTotal();
 }
 
 function updateAmountDisplay(editMode) {
@@ -234,11 +235,26 @@ function renderCatGrid(editMode) {
   grid.innerHTML = cats.map((c) => {
     const sel = s.catId === c.id ? ' sel' : '';
     const tint = c.color + '22';
-    return `<button class="cat-item${sel}" data-cat="${c.id}" style="--cat:${c.color}">
-      <span class="cat-ic" style="background:${tint};color:${c.color}">${ICONS[c.icon] || ICONS.dots}</span>
-      <span>${escapeHtml(c.name)}</span>
+    return `<button class="cat-item${sel}" data-cat="${c.id}">
+      <i style="background:${tint};color:${c.color}">${ICONS[c.icon] || ICONS.dots}</i>
+      <p>${escapeHtml(c.name)}</p>
     </button>`;
   }).join('');
+  grid.classList.toggle('more', cats.length > 8);
+  const hint = $('#cat-more-hint');
+  if (!editMode && hint) hint.textContent = cats.length > 8 ? `共 ${cats.length} 个 · 上滑查看更多` : '';
+}
+
+/* 金额卡右上角的本月累计（跟随当前类型与所选月份） */
+function renderMonthTotal() {
+  const ym = currentMonth();
+  const sum = loadRecords()
+    .filter((r) => (r.date || '').startsWith(ym) && r.type === state.type)
+    .reduce((s, r) => s + r.amount, 0);
+  const el = $('#month-total');
+  if (el) el.textContent = fmtMoney(sum);
+  const tag = $('#amount-tag');
+  if (tag) tag.textContent = state.type === 'expense' ? '支出' : '收入';
 }
 
 function onKey(key, editMode) {
@@ -296,6 +312,7 @@ function saveRecord() {
   }
   renderList();
   renderStats();
+  renderMonthTotal();
   renderBackupHint();
 }
 
@@ -315,6 +332,7 @@ function shiftMonth(delta) {
   state.week = null;
   renderList();
   renderStats();
+  renderMonthTotal();
 }
 function monthLabel(ym) {
   const [y, m] = ym.split('-');
@@ -479,6 +497,7 @@ async function deleteEditing() {
   closeEdit();
   renderList();
   renderStats();
+  renderMonthTotal();
   renderBackupHint();
 }
 
@@ -620,6 +639,7 @@ async function importData(file) {
     renderList();
     renderStats();
     renderCatManage();
+    renderMonthTotal();
     renderBackupHint();
     toast('导入成功');
   };
@@ -882,6 +902,7 @@ function bindEvents() {
     resetForm();
     renderList();
     renderStats();
+    renderMonthTotal();
     renderBackupHint();
     toast('已清空');
   });
@@ -938,6 +959,7 @@ function init() {
   if (verEl) verEl.textContent = `当前版本 ${APP_VERSION}`;
   bindEvents();
   renderCatGrid(false);
+  renderMonthTotal();
   renderList();
   renderStats();
   renderCatManage();
