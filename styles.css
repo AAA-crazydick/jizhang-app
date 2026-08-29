@@ -388,29 +388,29 @@ input { font-family: inherit; }
   padding: 36px 0;
 }
 
-/* 统计英雄卡：本月结余为主数字，收入/支出为次级两列 */
+/* 统计英雄卡：本月结余为主数字，收入/支出为次级两列（紧凑高度） */
 .hero-card {
   background: linear-gradient(135deg, #0c5e43 0%, #0a9d6a 100%);
   border-radius: var(--radius);
-  padding: 14px 16px 12px;
-  margin-bottom: 10px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
   flex-shrink: 0;
   color: #fff;
   box-shadow: 0 1px 2px rgba(12, 94, 67, 0.2), 0 10px 26px rgba(10, 157, 106, 0.28);
 }
-.hero-balance { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.hero-label { font-size: 11px; opacity: 0.75; }
-.hero-value { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.5px; }
+.hero-balance { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.hero-label { font-size: 10px; opacity: 0.75; }
+.hero-value { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.5px; }
 .hero-row {
   display: flex;
-  margin-top: 10px;
-  padding-top: 10px;
+  margin-top: 8px;
+  padding-top: 8px;
   border-top: 1px solid rgba(255, 255, 255, 0.18);
 }
-.hero-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.hero-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px; }
 .hero-col + .hero-col { border-left: 1px solid rgba(255, 255, 255, 0.18); }
-.hero-col span { font-size: 11px; opacity: 0.75; }
-.hero-col b { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.hero-col span { font-size: 10px; opacity: 0.75; }
+.hero-col b { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .card {
   background: var(--card);
@@ -420,19 +420,19 @@ input { font-family: inherit; }
   margin-bottom: 10px;
   flex-shrink: 0;
 }
-.card h3 { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+.card h3 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
 
-.donut-row { display: flex; align-items: center; gap: 12px; }
 .donut {
-  width: 96px;
-  height: 96px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   position: relative;
   flex-shrink: 0;
   background: #eceef1;
 }
 /* 占比渐变画在 ::before 上，用 conic mask 做扫描动画（不影响中心文字） */
-@property --sweep { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+/* initial-value 必须是 360deg：动画结束后属性回弹到初始值，若是 0deg 整个环会被遮罩藏掉 */
+@property --sweep { syntax: "<angle>"; inherits: false; initial-value: 360deg; }
 .donut::before {
   content: "";
   position: absolute;
@@ -442,12 +442,12 @@ input { font-family: inherit; }
   -webkit-mask: conic-gradient(#000 var(--sweep, 360deg), transparent 0);
   mask: conic-gradient(#000 var(--sweep, 360deg), transparent 0);
 }
-.donut.pie::before { animation: pieSweep 0.7s cubic-bezier(0.32, 0.72, 0, 1); }
+.donut.pie::before { animation: pieSweep 0.7s cubic-bezier(0.32, 0.72, 0, 1) both; }
 @keyframes pieSweep { from { --sweep: 0deg; } to { --sweep: 360deg; } }
 .donut::after {
   content: "";
   position: absolute;
-  inset: 18px;
+  inset: 15px;
   background: var(--card);
   border-radius: 50%;
 }
@@ -460,17 +460,22 @@ input { font-family: inherit; }
   justify-content: center;
   z-index: 1;
 }
-.donut .donut-center b { font-size: 13px; font-weight: 700; max-width: 68px; text-align: center; overflow: hidden; text-overflow: ellipsis; }
-.donut .donut-center span { font-size: 10px; color: var(--sub); }
-.donut-legend { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
-.legend-dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+.donut .donut-center b { font-size: 10px; font-weight: 700; max-width: 36px; text-align: center; overflow: hidden; text-overflow: ellipsis; }
+.donut .donut-center span { font-size: 8px; color: var(--sub); }
+/* 双环并排（支出/收入），紧凑布局保证统计页一屏显示 */
+.donut-duo { display: flex; gap: 14px; }
+.donut-block { flex: 1; min-width: 0; }
+.donut-block-title { font-size: 11px; color: var(--sub); font-weight: 500; margin-bottom: 6px; }
+.donut-flex { display: flex; align-items: center; gap: 8px; }
+.legend-mini { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.legend-item { display: flex; align-items: center; gap: 4px; font-size: 10px; line-height: 1.3; }
+.legend-dot { width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; }
 .legend-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.legend-pct { color: var(--sub); font-size: 11px; }
-.legend-val { font-weight: 600; font-variant-numeric: tabular-nums; }
+.legend-val { color: var(--sub); font-size: 10px; font-variant-numeric: tabular-nums; }
+.legend-mini .empty { padding: 10px 0; font-size: 10px; width: 100%; }
 
 /* 每日支出（整月约 31 根柱子，间距和宽度收紧，逐根生长动画） */
-.trend { display: flex; align-items: flex-end; gap: 2px; height: 120px; }
+.trend { display: flex; align-items: flex-end; gap: 2px; height: 86px; }
 .trend-day { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; height: 100%; }
 .trend-bar {
   width: 100%;

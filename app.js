@@ -421,8 +421,8 @@ function renderBreakdown(type, records, total, donutEl, legendEl) {
   if (!records.length || total <= 0) {
     donutEl.classList.remove('pie');
     donutEl.style.removeProperty('--pie');
-    donutEl.innerHTML = '<div class="donut-center"><b>--</b><span>暂无数据</span></div>';
-    legendEl.innerHTML = '<div class="empty" style="padding:20px 0">本月暂无记录</div>';
+    donutEl.innerHTML = '<div class="donut-center"><b>--</b><span>暂无</span></div>';
+    legendEl.innerHTML = '<div class="empty">暂无记录</div>';
     return;
   }
   const items = breakdown(records);
@@ -435,15 +435,14 @@ function renderBreakdown(type, records, total, donutEl, legendEl) {
   }).join(',');
   donutEl.classList.add('pie');
   donutEl.style.setProperty('--pie', `conic-gradient(${stops})`);
-  donutEl.innerHTML = `<div class="donut-center"><b>${fmtMoney(total)}</b><span>${type === 'expense' ? '支出' : '收入'}总额</span></div>`;
+  /* 总数已在英雄卡展示，环心留空 */
+  donutEl.innerHTML = '';
   legendEl.innerHTML = items.map((it) => {
     const c = catOrUnknown(it.cat);
-    const pct = (it.sum / total * 100).toFixed(1);
     return `<div class="legend-item">
       <span class="legend-dot" style="background:${c.color}"></span>
       <span class="legend-name">${escapeHtml(c.name)}</span>
       <span class="legend-val">${fmtMoney(it.sum).slice(1)}</span>
-      <span class="legend-pct">${pct}%</span>
     </div>`;
   }).join('');
 }
@@ -477,7 +476,7 @@ function renderTrend(rs) {
     return `
     <div class="trend-day">
       <span class="trend-val">${showVal ? fmtMoney(d.sum).slice(1) : ''}</span>
-      <div class="trend-bar${isMax ? ' high' : ''}" style="--i:${idx};height:${Math.max(4, d.sum / max * 90)}px"></div>
+      <div class="trend-bar${isMax ? ' high' : ''}" style="--i:${idx};height:${Math.max(3, d.sum / max * 56)}px"></div>
       <span class="trend-label">${showLabel(i) ? d.label : ''}</span>
     </div>
   `;
