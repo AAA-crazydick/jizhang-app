@@ -117,7 +117,9 @@ const state = {
   type: 'expense',
   amount: '',
   catId: null,
-  note: ''
+  note: '',
+  month: '',
+  week: null   /* 明细页当前周页码；null = 打开时定位到今天所在周 */
 };
 
 /* 编辑弹层使用独立状态，不与主表单互相污染 */
@@ -289,6 +291,8 @@ function shiftMonth(delta) {
   const [y, m] = currentMonth().split('-').map(Number);
   const d = new Date(y, m - 1 + delta, 1);
   state.month = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+  /* 重置为默认定位：当前月自动回到今天所在周 */
+  state.week = null;
   renderList();
   renderStats();
 }
@@ -301,45 +305,110 @@ function dayLabel(dateStr) {
   const y = new Date(dateStr + 'T00:00');
   const ty = new Date(today + 'T00:00');
   const diff = Math.round((ty - y) / 86400000);
-  if (diff === 0) return '今天';
-  if (diff === 1) return '昨天';
-  const label = `${y.getMonth() + 1}月${y.getDate()}日`;
+  const wd = `周${'日一二三四五六'[y.getDay()]}`;
+  if (diff === 0) return `今天 ${wd}`;
+  if (diff === 1) return `昨天 ${wd}`;
+  const label = `${y.getMonth() + 1}月${y.getDate()}日 ${wd}`;
   return y.getFullYear() === ty.getFullYear() ? label : `${y.getFullYear()}年${label}`;
+}
+
+/* 所选月份按周（周一为首）切页 */
+function monthWeeks(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const offset = (new Date(y, m - 1, 1).getDay() + 6) % 7;
+  const weeks = [];
+  for (let start = 1 - offset; start <= daysInMonth; start += 7) {
+    weeks.push({ from: Math.max(1, start), to: Math.min(daysInMonth, start + 6) });
+  }
+  return weeks;
+}
+
+function defaultWeek(ym, weeks) {
+  const today = nowParts().date;
+  if (today.startsWith(ym)) {
+    const d = Number(today.slice(8, 10));
+    const i = weeks.findIndex((w) => d >= w.from && d <= w.to);
+    if (i > -1) return i;
+  }
+  return 0;
+}
+
+function searchFilter(rs, q) {
+  if (!q) return rs;
+  return rs.filter((r) => {
+    const c = catOrUnknown(r.category);
+    return (r.note || '').toLowerCase().includes(q) || c.name.toLowerCase().includes(q);
+  });
 }
 
 function renderList() {
   const ym = currentMonth();
   $('#month-label-list').textContent = monthLabel(ym);
   const q = $('#search-input').value.trim().toLowerCase();
-  let rs = loadRecords().filter((r) => (r.date || '').startsWith(ym));
-  if (q) {
-    rs = rs.filter((r) => {
-      const c = catOrUnknown(r.category);
-      return (r.note || '').toLowerCase().includes(q) || c.name.toLowerCase().includes(q);
-    });
-  }
-  rs.sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time) || (b.createdAt || 0) - (a.createdAt || 0));
+  const monthRs = loadRecords().filter((r) => (r.date || '').startsWith(ym));
+  const weeks = monthWeeks(ym);
+  if (state.week === null || state.week === undefined) state.week = defaultWeek(ym, weeks);
+  if (state.week >= weeks.length) state.week = weeks.length - 1;
 
-  const sumExp = rs.filter((r) => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
-  const sumInc = rs.filter((r) => r.type === 'income').reduce((s, r) => s + r.amount, 0);
-  $('#sum-expense').textContent = fmtMoney(sumExp);
-  $('#sum-income').textContent = fmtMoney(sumInc);
+  /* 月度汇总（跟随搜索过滤） */
+  const qMonth = searchFilter(monthRs, q);
+  $('#sum-expense').textContent = fmtMoney(qMonth.filter((r) => r.type === 'expense').reduce((s, r) => s + r.amount, 0));
+  $('#sum-income').textContent = fmtMoney(qMonth.filter((r) => r.type === 'income').reduce((s, r) => s + r.amount, 0));
+
+  const navEl = $('#week-nav');
+  let pageRs;
+  if (q) {
+    /* 搜索时跨周显示全部结果 */
+    pageRs = qMonth;
+    navEl.classList.add('searching');
+    $('#week-label').textContent = `搜索到 ${pageRs.length} 条`;
+    $('#week-expense').textContent = '';
+  } else {
+    if (state.week < 0) state.week = 0;
+    const wk = weeks[state.week];
+    pageRs = monthRs.filter((r) => {
+      const d = Number((r.date || '').slice(8, 10));
+      return d >= wk.from && d <= wk.to;
+    });
+    navEl.classList.remove('searching');
+    $('#week-label').textContent = `第 ${state.week + 1}/${weeks.length} 周 · ${Number(ym.slice(5, 7))}月${wk.from}日–${wk.to}日`;
+    const wkExp = pageRs.filter((r) => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+    $('#week-expense').textContent = `本周支出 ${fmtMoney(wkExp)}`;
+    $('#prev-week').disabled = state.week === 0;
+    $('#next-week').disabled = state.week === weeks.length - 1;
+  }
 
   const body = $('#list-body');
-  if (!rs.length) {
-    body.innerHTML = '<div class="empty">这个月还没有记录<br>去「记账」页记一笔吧</div>';
+  if (!pageRs.length) {
+    body.innerHTML = `<div class="empty">${q ? '没有匹配的记录' : '这一周还没有记录<br>去「记账」页记一笔吧'}</div>`;
     return;
   }
-
+  pageRs.sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time) || (b.createdAt || 0) - (a.createdAt || 0));
   const groups = {};
-  rs.forEach((r) => { (groups[r.date] = groups[r.date] || []).push(r); });
-
-  body.innerHTML = Object.keys(groups).map((date) => `
+  pageRs.forEach((r) => { (groups[r.date] = groups[r.date] || []).push(r); });
+  body.innerHTML = Object.keys(groups).map((date) => {
+    const dayExp = groups[date].filter((r) => r.type === 'expense').reduce((s, r) => s + r.amount, 0);
+    return `
     <div class="list-group">
-      <div class="list-date">${dayLabel(date)}</div>
+      <div class="list-date"><span>${dayLabel(date)}</span>${dayExp > 0 ? `<b class="day-sum">支出 ${fmtMoney(dayExp)}</b>` : ''}</div>
       ${groups[date].map(itemHTML).join('')}
     </div>
-  `).join('');
+  `;
+  }).join('');
+}
+
+/* 周翻页：切换后按方向播放翻页动画 */
+function shiftWeek(delta) {
+  const weeks = monthWeeks(currentMonth());
+  const next = state.week + delta;
+  if (next < 0 || next >= weeks.length) return;
+  state.week = next;
+  renderList();
+  const body = $('#list-body');
+  body.classList.remove('flip-left', 'flip-right');
+  void body.offsetWidth;
+  body.classList.add(delta > 0 ? 'flip-left' : 'flip-right');
 }
 
 function itemHTML(r) {
@@ -518,6 +587,7 @@ async function importData(file) {
     saveRecords(rs);
     saveCustomCats(cats);
     state.month = '';
+    state.week = null;
     resetForm();
     renderList();
     renderStats();
@@ -660,6 +730,25 @@ function bindEvents() {
   $('#next-month-stats').addEventListener('click', () => shiftMonth(1));
   $('#search-input').addEventListener('input', renderList);
 
+  $('#prev-week').addEventListener('click', () => shiftWeek(-1));
+  $('#next-week').addEventListener('click', () => shiftWeek(1));
+
+  /* 明细页左右滑动翻周 */
+  let touchX = null, touchY = null;
+  const listView = $('#view-list');
+  listView.addEventListener('touchstart', (e) => {
+    touchX = e.touches[0].clientX;
+    touchY = e.touches[0].clientY;
+  }, { passive: true });
+  listView.addEventListener('touchend', (e) => {
+    if (touchX === null) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchX;
+    const dy = t.clientY - touchY;
+    touchX = null;
+    if (Math.abs(dx) > 56 && Math.abs(dx) > Math.abs(dy) * 1.5) shiftWeek(dx < 0 ? 1 : -1);
+  });
+
   $('#edit-close').addEventListener('click', closeEdit);
   $('#edit-backdrop').addEventListener('click', (e) => { if (e.target.id === 'edit-backdrop') closeEdit(); });
   $('#edit-save-btn').addEventListener('click', saveRecord);
@@ -678,6 +767,7 @@ function bindEvents() {
     if (!(await showConfirm(`确定清空所有记账记录吗？共 ${n} 条，此操作不可恢复，建议先导出备份。`, '清空'))) return;
     saveRecords([]);
     state.month = '';
+    state.week = null;
     resetForm();
     renderList();
     renderStats();
