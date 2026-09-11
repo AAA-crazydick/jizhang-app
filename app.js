@@ -9,7 +9,7 @@ const LS_CATS_DEL = 'jz_cat_del_v1';    /* 已删除的分类 id（含默认分�
 const LS_LAST_BACKUP = 'jz_last_backup_v1';
 
 /* 应用版本号：每次发布新版本时随部署一起更新 */
-const APP_VERSION = 'v1.11.0';
+const APP_VERSION = 'v1.12.0';
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -204,6 +204,7 @@ function hideSheet(el) {
 const TITLES = { record: '记一笔', list: '明细', stats: '统计', settings: '设置' };
 
 function switchView(name) {
+  closeCatInfo();
   $$('.view').forEach((v) => v.classList.remove('active'));
   $('#view-' + name).classList.add('active');
   $$('.tab').forEach((t) => t.classList.toggle('active', t.dataset.view === name));
@@ -322,6 +323,7 @@ function saveRecord() {
   renderStats();
   renderMonthTotal();
   renderBackupHint();
+  refreshCatInfo();
 }
 
 /* ================= 明细 ================= */
@@ -338,6 +340,7 @@ function shiftMonth(delta) {
   state.month = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
   /* 重置为默认定位：当前月自动回到今天 */
   state.day = null;
+  closeCatInfo();
   renderList();
   renderStats();
   renderMonthTotal();
@@ -507,6 +510,7 @@ async function deleteEditing() {
   renderStats();
   renderMonthTotal();
   renderBackupHint();
+  refreshCatInfo();
 }
 
 /* ================= 统计（方案2：流向 + 双环 + 曲线） ================= */
@@ -523,8 +527,8 @@ function renderStats() {
   $('#stat-balance').textContent = fmtMoney(incSum - expSum);
 
   renderFlow(incSum, expSum);
-  renderBreakdown(exp, expSum, $('#expense-donut'), $('#expense-legend'));
-  renderBreakdown(inc, incSum, $('#income-donut'), $('#income-legend'));
+  renderBreakdown(exp, expSum, $('#expense-donut'), $('#expense-legend'), 'expense');
+  renderBreakdown(inc, incSum, $('#income-donut'), $('#income-legend'), 'income');
   renderCurve(ym, exp);
 }
 
@@ -550,7 +554,8 @@ function breakdown(records) {
   return Object.keys(map).map((cat) => ({ cat, sum: round2(map[cat]) })).sort((a, b) => b.sum - a.sum);
 }
 
-function renderBreakdown(records, total, donutEl, legendEl) {
+function renderBreakdown(records, total, donutEl, legendEl, type) {
+  legendEl.dataset.type = type;
   if (!records.length || total <= 0) {
     donutEl.style.removeProperty('--pie');
     donutEl.innerHTML = '<div class="c"><b>--</b><span>暂无</span></div>';
@@ -567,10 +572,64 @@ function renderBreakdown(records, total, donutEl, legendEl) {
   }).join(',');
   donutEl.style.setProperty('--pie', `conic-gradient(${stops})`);
   donutEl.innerHTML = `<div class="c"><b>${fmtMoney(total)}</b><span>${items.length} 类</span></div>`;
+  /* 每一项都可点击，点开后看这个分类本月具体花了什么 */
   legendEl.innerHTML = items.map((it) => {
     const c = catOrUnknown(it.cat);
-    return `<div class="li"><i style="background:${c.color}"></i><span>${escapeHtml(c.name)}</span><b>${Math.round(it.sum / total * 100)}%</b></div>`;
+    return `<button type="button" class="li" data-cat="${escapeHtml(it.cat)}"><i style="background:${c.color}"></i><span>${escapeHtml(c.name)}</span><b>${Math.round(it.sum / total * 100)}%</b></button>`;
   }).join('');
+}
+
+/* ================= 分类明细（点构成图分类） ================= */
+let catInfoOpen = null; /* { catId, type }，记住当前弹层在看哪个分类，编辑后好刷新 */
+
+function catInfoItemHTML(r, catTotal) {
+  const c = catOrUnknown(r.category);
+  const tint = c.color + '22';
+  const cls = r.type === 'expense' ? 'expense' : 'income';
+  const sign = r.type === 'expense' ? '-' : '+';
+  const day = r.date ? `${Number(r.date.slice(5, 7))}月${Number(r.date.slice(8, 10))}日` : '';
+  const sub = [day, r.time].filter(Boolean).join(' ');
+  const pct = catTotal > 0 ? Math.round(r.amount / catTotal * 100) : 0;
+  return `<button class="list-card" data-id="${r.id}">
+    <span class="item-ic" style="background:${tint};color:${c.color}">${ICONS[c.icon] || ICONS.dots}</span>
+    <span class="item-main">
+      <div class="item-name">${escapeHtml(r.note || '无备注')}</div>
+      <div class="item-note">${sub}</div>
+    </span>
+    <span>
+      <div class="item-amount ${cls}">${sign}${fmtMoney(r.amount).slice(1)}</div>
+      <div class="item-time">${pct}%</div>
+    </span>
+  </button>`;
+}
+
+function renderCatInfo(catId, type) {
+  const ym = currentMonth();
+  const c = catOrUnknown(catId);
+  const rs = loadRecords()
+    .filter((r) => (r.date || '').startsWith(ym) && r.category === catId && r.type === type)
+    .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time) || (b.createdAt || 0) - (a.createdAt || 0));
+  const total = round2(rs.reduce((s, r) => s + r.amount, 0));
+  $('#catinfo-title').innerHTML = `${escapeHtml(c.name)}<small>${monthLabel(ym)} · ${rs.length} 笔 · ${fmtMoney(total)}</small>`;
+  $('#catinfo-list').innerHTML = rs.length
+    ? rs.map((r) => catInfoItemHTML(r, total)).join('')
+    : `<div class="empty">本月这个分类还没有${type === 'expense' ? '支出' : '收入'}记录</div>`;
+}
+
+function openCatInfo(catId, type) {
+  catInfoOpen = { catId, type };
+  renderCatInfo(catId, type);
+  $('#catinfo-backdrop').classList.remove('hidden', 'closing');
+}
+
+function closeCatInfo() {
+  catInfoOpen = null;
+  hideSheet($('#catinfo-backdrop'));
+}
+
+/* 编辑/删除记录后，若明细弹层还开着就同步刷新 */
+function refreshCatInfo() {
+  if (catInfoOpen) renderCatInfo(catInfoOpen.catId, catInfoOpen.type);
 }
 
 /* 每日支出平滑趋势曲线（跟随月份切换，峰值红点标注） */
@@ -882,6 +941,23 @@ function bindEvents() {
   });
 
   $('#list-body').addEventListener('click', (e) => {
+    const card = e.target.closest('.list-card');
+    if (card) openEdit(card.dataset.id);
+  });
+
+  /* 统计页构成图：点某个分类看这个分类本月的全部记录 */
+  const onLegendClick = (e) => {
+    const li = e.target.closest('.li[data-cat]');
+    if (!li) return;
+    openCatInfo(li.dataset.cat, e.currentTarget.dataset.type);
+  };
+  $('#expense-legend').addEventListener('click', onLegendClick);
+  $('#income-legend').addEventListener('click', onLegendClick);
+
+  /* 分类明细弹层：点记录继续编辑 */
+  $('#catinfo-close').addEventListener('click', closeCatInfo);
+  $('#catinfo-backdrop').addEventListener('click', (e) => { if (e.target.id === 'catinfo-backdrop') closeCatInfo(); });
+  $('#catinfo-list').addEventListener('click', (e) => {
     const card = e.target.closest('.list-card');
     if (card) openEdit(card.dataset.id);
   });
