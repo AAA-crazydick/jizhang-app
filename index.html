@@ -119,12 +119,12 @@
 
         <div class="duo">
           <div class="dcard">
-            <h4>支出构成</h4>
+            <h4>支出构成<small>轻点分类看明细</small></h4>
             <div class="donut" id="expense-donut"></div>
             <div class="lg" id="expense-legend"></div>
           </div>
           <div class="dcard">
-            <h4>收入构成</h4>
+            <h4>收入构成<small>轻点分类看明细</small></h4>
             <div class="donut" id="income-donut"></div>
             <div class="lg" id="income-legend"></div>
           </div>
@@ -296,6 +296,19 @@
       <div class="edit-actions">
         <button class="save-btn flex-1" id="ec-save-btn">保存修改</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 分类明细弹层：点统计页构成图的分类，查看该类本月全部记录 -->
+  <div class="sheet-backdrop catinfo-backdrop hidden" id="catinfo-backdrop">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h2 id="catinfo-title">分类明细</h2>
+        <button class="sheet-close" id="catinfo-close" aria-label="关闭">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="catinfo-list" class="list-body"></div>
     </div>
   </div>
 
