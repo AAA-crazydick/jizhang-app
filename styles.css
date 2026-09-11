@@ -387,6 +387,25 @@ input { font-family: inherit; }
 .dhd .s.in { color: var(--primary); }
 
 /* 统计：结余条 + 收支流向 + 双环 + 曲线（方案2） */
+
+/* 卡片基底。这一整块原先在文件里是缺失的，导致「收支流向」「每日支出趋势」
+   没有白色卡片容器、标题退回浏览器默认的 18.7px，层级和旁边的分类卡片对不上 */
+.card {
+  background: var(--card);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 12px 14px;
+  margin-top: 10px;
+  flex-shrink: 0;
+}
+.card > h3 { font-size: 14px; font-weight: 600; letter-spacing: -.1px; }
+.card .sub { font-size: 10.5px; color: var(--sub); margin-top: 3px; font-variant-numeric: tabular-nums; }
+/* 标题行：标题在左、关键数字在右。比「标题 + 一整行副标题」省下一行高度，
+   一屏约束下这点空间很关键（实测省 15px） */
+.card .hd { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.card .hd .k { font-size: 10.5px; color: var(--sub); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.card .hd .k b { color: var(--text); font-weight: 600; }
+
 .strip { background: var(--card); border-radius: 16px; box-shadow: var(--shadow); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
 .strip .b small { display: block; font-size: 10.5px; color: var(--sub); }
 .strip .b b { font-size: 22px; font-weight: 800; color: var(--primary); font-variant-numeric: tabular-nums; letter-spacing: -.3px; }
@@ -401,7 +420,7 @@ input { font-family: inherit; }
 .flow .bar .ex { background: linear-gradient(90deg, #ff7a70, var(--expense)); }
 .flow .pct { display: flex; justify-content: space-between; margin-top: 6px; font-size: 10px; color: var(--sub); }
 
-.duo { display: flex; gap: 10px; flex-shrink: 0; }
+.duo { display: flex; gap: 10px; margin-top: 10px; flex-shrink: 0; }
 .dcard { flex: 1; min-width: 0; background: var(--card); border-radius: 16px; box-shadow: var(--shadow); padding: 12px 12px 10px; }
 .dcard h4 { font-size: 12.5px; font-weight: 700; text-align: center; margin-bottom: 8px; }
 .dcard h4 small { display: block; font-size: 9px; font-weight: 500; color: var(--sub); margin-top: 2px; }
@@ -429,8 +448,20 @@ input { font-family: inherit; }
 .lg .li span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lg .li b { font-weight: 600; font-variant-numeric: tabular-nums; }
 
-.curve svg { width: 100%; height: 110px; display: block; }
-.xl { display: flex; justify-content: space-between; font-size: 9px; color: #b6bdc9; padding: 2px 4px 0; }
+/* 每日支出趋势：细柱。一天一根，零支出留浅灰矮桩（不再贴底拉成一条断线），
+   未来日期用更浅的桩区分「还没到那天」和「那天没花钱」 */
+.curve .chart { position: relative; margin-top: 8px; }
+.curve svg { width: 100%; height: auto; display: block; overflow: visible; }
+.curve .hit { pointer-events: all; }
+.curve .tip {
+  position: absolute; top: -2px; left: 0; transform: translateX(-50%);
+  background: rgba(31, 35, 41, .93); color: #fff;
+  font-size: 10.5px; padding: 4px 8px; border-radius: 7px;
+  white-space: nowrap; pointer-events: none;
+  opacity: 0; transition: opacity .12s, left .12s;
+  z-index: 3; font-variant-numeric: tabular-nums;
+}
+.curve .tip.show { opacity: 1; }
 
 /* 周翻页切换动画 */
 @keyframes flipLeft { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: none; } }
