@@ -9,7 +9,7 @@ const LS_CATS_DEL = 'jz_cat_del_v1';    /* 已删除的分类 id（含默认分�
 const LS_LAST_BACKUP = 'jz_last_backup_v1';
 
 /* 应用版本号：每次发布新版本时随部署一起更新 */
-const APP_VERSION = 'v1.12.0';
+const APP_VERSION = 'v1.13.0';
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -632,7 +632,12 @@ function refreshCatInfo() {
   if (catInfoOpen) renderCatInfo(catInfoOpen.catId, catInfoOpen.type);
 }
 
-/* 每日支出平滑趋势曲线（跟随月份切换，峰值红点标注） */
+/* ================= 每日支出趋势（细柱） =================
+   为什么不用折线：31 天挤在 333px 里，没花钱的日子会让折线贴底成一条直线，
+   看上去像图断了；柱状反而把「节拍」保住了。 */
+const CURVE_W = 333, CURVE_H = 112, CURVE_BASE = 86, CURVE_PLOT = 70, CURVE_GAP = 3;
+let curveTipTimer = null;
+
 function renderCurve(ym, exp) {
   const [y, m] = ym.split('-').map(Number);
   const n = new Date(y, m, 0).getDate();
@@ -640,29 +645,74 @@ function renderCurve(ym, exp) {
   exp.forEach((r) => { if (r.date) per[r.date] = (per[r.date] || 0) + r.amount; });
   const vals = [];
   for (let d = 1; d <= n; d++) vals.push(per[`${ym}-${pad(d)}`] || 0);
-  const max = Math.max(...vals, 0);
+
   const svg = $('#curve-svg');
-  const sub = $('#curve-sub');
+  const meta = $('#curve-meta');
+  const max = Math.max(...vals, 0);
   if (max <= 0) {
     svg.innerHTML = '';
-    sub.textContent = '本月暂无支出';
+    meta.textContent = '本月暂无支出';
     return;
   }
+  const today = nowParts().date;
+  const total = round2(vals.reduce((a, b) => a + b, 0));
+  const avg = total / n;
   const peak = vals.indexOf(max);
-  const X = (i) => 5 + (i / (n - 1)) * 320;
-  const Y = (v) => 104 - (v / max) * 92;
-  let d = `M ${X(0).toFixed(1)} ${Y(vals[0]).toFixed(1)}`;
-  for (let i = 1; i < n; i++) d += ` L ${X(i).toFixed(1)} ${Y(vals[i]).toFixed(1)}`;
-  const dots = vals.map((v, i) => {
-    if (v <= 0) return '';
-    const fill = i === peak ? '#fa5151' : '#0a9d6a';
-    const halo = i === peak ? `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="6.5" fill="#fa5151" opacity=".2"/>` : '';
-    return `${halo}<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="3" fill="${fill}"/>`;
-  }).join('');
-  svg.innerHTML = `<defs><linearGradient id="cfill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0a9d6a" stop-opacity=".22"/><stop offset="1" stop-color="#0a9d6a" stop-opacity="0"/></linearGradient></defs>
-    <path d="${d} L ${X(n - 1).toFixed(1)} 106 L ${X(0).toFixed(1)} 106 Z" fill="url(#cfill)"/>
-    <path d="${d}" fill="none" stroke="#0a9d6a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>${dots}`;
-  sub.textContent = `峰值 ${m}/${peak + 1} ${fmtMoney(max)} · 日均 ${fmtMoney(round2(exp.reduce((s, r) => s + r.amount, 0) / n))}`;
+
+  const bw = (CURVE_W - CURVE_GAP * (n - 1)) / n;   // 单根柱宽
+  const cx = (i) => bw / 2 + i * (bw + CURVE_GAP);  // 第 i 根柱的中心
+
+  let bars = '';
+  for (let i = 0; i < n; i++) {
+    const v = vals[i];
+    const future = `${ym}-${pad(i + 1)}` > today;
+    const isZero = v <= 0, isPeak = i === peak;
+    const h = isZero ? 2.5 : Math.max(3.5, (v / max) * CURVE_PLOT);
+    // 未来日期不能画成 0（那是撒谎），用更浅的桩表示「还没到那天」
+    const fill = isPeak ? '#fa5151' : (isZero ? (future ? '#f1f4f8' : '#e6eaf0') : 'url(#curveBar)');
+    const hit = future ? '' : `<rect class="hit" x="${(cx(i) - (bw + CURVE_GAP) / 2).toFixed(2)}" y="${CURVE_BASE - CURVE_PLOT - 4}" width="${(bw + CURVE_GAP).toFixed(2)}" height="${CURVE_PLOT + 8}" fill="transparent" data-tip="${m}月${i + 1}日 · ${fmtMoney(v)}"/>`;
+    bars += `<g><rect x="${(cx(i) - bw / 2).toFixed(2)}" y="${(CURVE_BASE - h).toFixed(2)}" width="${bw.toFixed(2)}" height="${h.toFixed(2)}" rx="${isZero ? 1.2 : 2.2}" fill="${fill}"/>${hit}</g>`;
+  }
+
+  const avgY = CURVE_BASE - (avg / max) * CURVE_PLOT;
+  // 峰值标签贴边时改对齐，免得数字跑出卡片
+  let lx = cx(peak), anchor = 'middle';
+  if (lx < 16) { lx = 16; anchor = 'start'; } else if (lx > CURVE_W - 16) { lx = CURVE_W - 16; anchor = 'end'; }
+  const ticks = [0, 7, 14, 21, 28].filter((i) => i < n)
+    .map((i) => `<text x="${cx(i).toFixed(1)}" y="${CURVE_H - 3}" text-anchor="middle" font-size="9" fill="#b6bdc9">${i + 1}</text>`).join('');
+
+  svg.innerHTML = `<defs>
+      <linearGradient id="curveBar" x1="0" y1="1" x2="0" y2="0">
+        <stop offset="0" stop-color="#fa5151"/><stop offset="1" stop-color="#ff8a80"/>
+      </linearGradient>
+    </defs>
+    <line x1="0" y1="${CURVE_BASE + .5}" x2="${CURVE_W}" y2="${CURVE_BASE + .5}" stroke="#eef0f3"/>
+    <line x1="0" y1="${avgY.toFixed(1)}" x2="${CURVE_W}" y2="${avgY.toFixed(1)}" stroke="#cfd6de" stroke-dasharray="3 3"/>
+    ${bars}
+    <text x="${CURVE_W}" y="${(avgY - 4).toFixed(1)}" text-anchor="end" font-size="8.5" fill="#9aa4b2" paint-order="stroke" stroke="#fff" stroke-width="2.5">日均</text>
+    <text x="${lx.toFixed(1)}" y="9" text-anchor="${anchor}" font-size="9.5" font-weight="700" fill="#fa5151" paint-order="stroke" stroke="#fff" stroke-width="2.5">${fmtMoney(max).slice(1)}</text>
+    ${ticks}`;
+
+  meta.innerHTML = `日均 <b>${fmtMoney(avg).slice(1)}</b>`;
+}
+
+/* 趋势图读数：点一下柱子浮出当天金额 */
+function showCurveTip(hit) {
+  const tip = $('#curve-tip');
+  const chart = $('#curve-chart');
+  const cr = chart.getBoundingClientRect();
+  const hr = hit.getBoundingClientRect();
+  tip.textContent = hit.dataset.tip;
+  tip.classList.add('show');
+  const half = tip.offsetWidth / 2 || 30;      // 贴边时收住，别让气泡跑出卡片
+  tip.style.left = Math.min(Math.max(hr.left - cr.left + hr.width / 2, half), cr.width - half) + 'px';
+  clearTimeout(curveTipTimer);
+  curveTipTimer = setTimeout(hideCurveTip, 2200);
+}
+function hideCurveTip() {
+  clearTimeout(curveTipTimer);
+  const tip = $('#curve-tip');
+  if (tip) tip.classList.remove('show');
 }
 
 /* ================= 设置 ================= */
@@ -961,6 +1011,19 @@ function bindEvents() {
     const card = e.target.closest('.list-card');
     if (card) openEdit(card.dataset.id);
   });
+
+  /* 每日支出趋势读数：鼠标划过跟手，手机上点一下看当天金额 */
+  const chartEl = $('#curve-chart');
+  chartEl.addEventListener('pointerdown', (e) => {
+    const hit = e.target.closest('.hit');
+    if (hit) showCurveTip(hit);
+  });
+  chartEl.addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    const hit = e.target.closest('.hit');
+    if (hit) showCurveTip(hit); else hideCurveTip();
+  });
+  chartEl.addEventListener('pointerleave', hideCurveTip);
 
   $('#prev-month').addEventListener('click', () => shiftMonth(-1));
   $('#next-month').addEventListener('click', () => shiftMonth(1));
